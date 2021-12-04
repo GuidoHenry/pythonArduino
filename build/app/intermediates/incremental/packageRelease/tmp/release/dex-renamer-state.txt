@@ -1,0 +1,4 @@
+#Fri Dec 03 23:41:40 ART 2021
+base.0=C\:\\Users\\Guido\\Documents\\Arduino\\espich_app\\build\\app\\intermediates\\dex\\release\\minifyReleaseWithR8\\classes.dex
+renamed.0=classes.dex
+path.0=classes.dex

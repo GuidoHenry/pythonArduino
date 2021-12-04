@@ -1,0 +1,12 @@
+<component name="libraryTable">
+  <library name="Flutter Plugins" type="FlutterPluginsLibraryType">
+    <CLASSES>
+      <root url="file://$USER_HOME$/Downloads/flutter_windows_2.5.3-stable/flutter/.pub-cache/hosted/pub.dartlang.org/speech_to_text-3.2.0" />
+      <root url="file://$USER_HOME$/Downloads/flutter_windows_2.5.3-stable/flutter/.pub-cache/hosted/pub.dartlang.org/permission_handler-5.1.0+2" />
+      <root url="file://$USER_HOME$/Downloads/flutter_windows_2.5.3-stable/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_blue-0.8.0" />
+      <root url="file://$USER_HOME$/Downloads/flutter_windows_2.5.3-stable/flutter/.pub-cache/hosted/pub.dartlang.org/flutter_bluetooth_serial-0.4.0" />
+    </CLASSES>
+    <JAVADOC />
+    <SOURCES />
+  </library>
+</component>

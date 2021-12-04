@@ -1,0 +1,276 @@
+import 'dart:typed_data';
+import 'package:avatar_glow/avatar_glow.dart';
+import 'package:espich_app/constants.dart';
+import 'package:espich_app/src/data.dart';
+import 'package:espich_app/src/widgets/custom_shape_clipper.dart';
+import 'package:flutter/material.dart';
+import 'package:highlight_text/highlight_text.dart';
+import 'package:speech_to_text/speech_to_text.dart';
+import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
+
+class SpeechPage extends StatefulWidget {
+  @override
+  _SpeechPageState createState() => _SpeechPageState();
+}
+
+class _SpeechPageState extends State<SpeechPage> {
+  SpeechToText _speech;
+  bool _isListening = false;
+  String _text = '';
+  double _confidence = 1.0;
+  double _voiceVolume = 0.0;
+  BluetoothConnection _bluetoothConnection;
+  bool _connected;
+
+  @override
+  void initState() {
+    super.initState();
+    _speech = SpeechToText();
+    _connected = false;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    Size size = MediaQuery.of(context).size;
+    return Scaffold(
+      body: Column(
+        children: [
+          Stack(
+            children: [
+              ClipPath(
+                clipper: CustomShapeClipper(),
+                child: Container(
+                  height: size.height * .3,
+                  width: double.infinity,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [Colors.blueAccent, Colors.cyanAccent],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Padding(
+                      padding: EdgeInsets.all(16),
+                      child: Center(
+                          child: Text(
+                        'Presiona el botón y empieza a hablar ...',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                            fontSize: 16, fontWeight: FontWeight.bold),
+                      )),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          buildRowPrecision(),
+          Container(
+              height: size.height * .42,
+              padding: EdgeInsets.symmetric(horizontal: 30),
+              child: ListView(
+                physics: BouncingScrollPhysics(),
+                children: [
+                  _text.isNotEmpty
+                      ? buildCardText()
+                      : Center(
+                          child: Text(
+                          '🎤',
+                          textScaleFactor: 3,
+                        )),
+                ],
+              )),
+          buildRow(),
+          buildVoiceSpectrum(),
+          buildFloatingButtons(),
+        ],
+      ),
+    );
+  }
+
+  Row buildRowPrecision() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(
+            child: Divider(
+          indent: 10,
+          endIndent: 10,
+        )),
+        Text('Precisión: ${(_confidence * 100).toStringAsFixed(1)}%'),
+        Expanded(
+          child: Divider(
+            indent: 10,
+            endIndent: 10,
+          ),
+        )
+      ],
+    );
+  }
+
+  Row buildFloatingButtons() {
+    return Row(
+      mainAxisSize: MainAxisSize.max,
+      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+      children: [
+        AvatarGlow(
+          animate: _isListening,
+          glowColor: Colors.blue[600],
+          endRadius: 50,
+          duration: Duration(seconds: 2),
+          repeat: true,
+          repeatPauseDuration: Duration(milliseconds: 100),
+          child: FloatingActionButton(
+            onPressed: _listen,
+            child: Icon(_isListening ? Icons.mic : Icons.mic_none),
+          ),
+        ),
+        FloatingActionButton(
+            mini: false,
+            backgroundColor:
+                (this._connected == true) ? Colors.amberAccent : Colors.grey,
+            tooltip: 'Enviar a la pantalla',
+            onPressed: () => sendText(),
+            child: Icon(Icons.send)),
+        FloatingActionButton(
+            mini: false,
+            backgroundColor:
+                (this._connected == true) ? Colors.grey : Colors.green,
+            tooltip: 'CONECTAR Bluetooth',
+            onPressed: () => connectBT(),
+            child: Icon(Icons.sensors)),
+        FloatingActionButton(
+            mini: false,
+            backgroundColor:
+                (this._connected == true) ? Colors.red : Colors.grey,
+            tooltip: 'DESCONECTAR Bluetooth',
+            onPressed: () => disconnectBT(),
+            child: Icon(Icons.sensors_off)),
+      ],
+    );
+  }
+
+  Padding buildVoiceSpectrum() {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8.0),
+      child: ClipRRect(
+        borderRadius: BorderRadius.all(Radius.circular(20)),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 250),
+          curve: Curves.ease,
+          decoration: BoxDecoration(
+              gradient: LinearGradient(colors: [
+            Constants.secondaryColor,
+            Constants.primaryLightColor,
+            Constants.primaryColor
+          ])),
+          height: 10,
+          width: _voiceVolume == 0 ? 10 : _voiceVolume * 10,
+        ),
+      ),
+    );
+  }
+
+  Card buildCardText() {
+    return Card(
+      elevation: 5,
+      child: Padding(
+        padding: const EdgeInsets.all(12.0),
+        child: TextHighlight(
+          text: _text,
+          textAlign: TextAlign.center,
+          words: highlights,
+          textStyle: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w500,
+              fontFamily: 'Poppins',
+              color: Colors.black,
+              height: 1.2),
+        ),
+      ),
+    );
+  }
+
+  Row buildRow() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Expanded(child: Divider()),
+      ],
+    );
+  }
+
+  void _listen() async {
+    if (!_isListening) {
+      bool available = await _speech.initialize(
+        onStatus: (val) => print('onStatus: $val'),
+        onError: (val) => print('onError: $val'),
+      );
+
+      print(available);
+
+      if (available) {
+        setState(() => _isListening = true);
+        _speech.listen(
+          onResult: (result) => setState(() {
+            _text = result.recognizedWords;
+
+            if (result.hasConfidenceRating && result.confidence > 0) {
+              _confidence = result.confidence;
+              _isListening = false;
+              _voiceVolume = 0;
+            }
+          }),
+          listenMode: ListenMode.dictation,
+          onSoundLevelChange: (level) {
+            setState(() => _voiceVolume = level > 1 ? level : 1);
+          },
+        );
+      }
+    } else {
+      setState(() => _isListening = false);
+      _voiceVolume = 0;
+      _speech.stop();
+    }
+  }
+
+  void sendText() async {
+    try {
+      Uint8List outputAsUint8List = new Uint8List.fromList(this._text.codeUnits);
+      this._bluetoothConnection.output.add(outputAsUint8List); // Sending data
+      print(this._text.length);
+    } catch (exception) {
+      print('Cannot connect, exception occured');
+    }
+  }
+
+  void connectBT() async {
+    String address = '00:19:09:01:1D:9A';
+    this._bluetoothConnection = await BluetoothConnection.toAddress(address);
+    String connect = "Conectar";
+    Uint8List outputAsUint8List = new Uint8List.fromList(connect.codeUnits);
+    await this._bluetoothConnection.output.add(outputAsUint8List);
+    setState(() {
+      this._connected = true;
+    });
+  }
+
+  void disconnectBT() async{
+    try {
+      String disconnect = "Desconectar";
+      Uint8List outputAsUint8List = new Uint8List.fromList(disconnect.codeUnits);
+      await this._bluetoothConnection.output.add(outputAsUint8List);
+      this._bluetoothConnection.close();
+    } catch (exception) {
+      print('Cannot connect, exception occured');
+    }
+    setState(() {
+      this._connected = false;
+    });
+  }
+
+  Future<List> getBoundedDevices() async {
+    FlutterBluetoothSerial connection = FlutterBluetoothSerial.instance;
+    Future<List<BluetoothDevice>> bondedDevices = connection.getBondedDevices();
+    return bondedDevices;
+  }
+}
