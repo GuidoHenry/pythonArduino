@@ -1,11 +1,19 @@
 import 'dart:typed_data';
+
+//ESTILO BOTON
 import 'package:avatar_glow/avatar_glow.dart';
+
+//ESTILOS
 import 'package:espich_app/constants.dart';
 import 'package:espich_app/src/data.dart';
 import 'package:espich_app/src/widgets/custom_shape_clipper.dart';
 import 'package:flutter/material.dart';
 import 'package:highlight_text/highlight_text.dart';
+
+//LIBRERIA DE VOZ A TEXTO
 import 'package:speech_to_text/speech_to_text.dart';
+
+//LIBRERIA DE CONEXION BT
 import 'package:flutter_bluetooth_serial/flutter_bluetooth_serial.dart';
 
 class SpeechPage extends StatefulWidget {
@@ -35,6 +43,7 @@ class _SpeechPageState extends State<SpeechPage> {
     return Scaffold(
       body: Column(
         children: [
+          //Fondo Gradiente superior
           Stack(
             children: [
               ClipPath(
@@ -63,24 +72,28 @@ class _SpeechPageState extends State<SpeechPage> {
               ),
             ],
           ),
+          //Si ya dictamos el texto mostramos la PRECISION de la escucha
           buildRowPrecision(),
+          // Si ya dictamos el texto, mostramos el texto
           Container(
               height: size.height * .42,
               padding: EdgeInsets.symmetric(horizontal: 30),
               child: ListView(
                 physics: BouncingScrollPhysics(),
                 children: [
-                  _text.isNotEmpty
-                      ? buildCardText()
-                      : Center(
+                  // Si el texto NO es vacio, muestro el texto. SINO muestro el icono del microfono.
+                  _text.isNotEmpty  ? buildCardText() : Center(
                           child: Text(
                           '🎤',
                           textScaleFactor: 3,
                         )),
                 ],
               )),
-          buildRow(),
+          //DIVISOR
+          Expanded(child: Divider(),),
+          // Icono de escucha mientras dictamos
           buildVoiceSpectrum(),
+          // FILA DE BOTONES
           buildFloatingButtons(),
         ],
       ),
@@ -108,10 +121,12 @@ class _SpeechPageState extends State<SpeechPage> {
   }
 
   Row buildFloatingButtons() {
+    //FILA
     return Row(
       mainAxisSize: MainAxisSize.max,
       mainAxisAlignment: MainAxisAlignment.spaceEvenly,
       children: [
+        //BOTON ESCUCHAR
         AvatarGlow(
           animate: _isListening,
           glowColor: Colors.blue[600],
@@ -124,6 +139,7 @@ class _SpeechPageState extends State<SpeechPage> {
             child: Icon(_isListening ? Icons.mic : Icons.mic_none),
           ),
         ),
+        //BOTON ENVIAR TEXTO
         FloatingActionButton(
             mini: false,
             backgroundColor:
@@ -131,6 +147,7 @@ class _SpeechPageState extends State<SpeechPage> {
             tooltip: 'Enviar a la pantalla',
             onPressed: () => sendText(),
             child: Icon(Icons.send)),
+        //BOTON CONECTAR BT
         FloatingActionButton(
             mini: false,
             backgroundColor:
@@ -138,6 +155,7 @@ class _SpeechPageState extends State<SpeechPage> {
             tooltip: 'CONECTAR Bluetooth',
             onPressed: () => connectBT(),
             child: Icon(Icons.sensors)),
+        // BOTON DESCONECTAR BT
         FloatingActionButton(
             mini: false,
             backgroundColor:
@@ -190,32 +208,33 @@ class _SpeechPageState extends State<SpeechPage> {
     );
   }
 
-  Row buildRow() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Expanded(child: Divider()),
-      ],
-    );
-  }
-
   void _listen() async {
+    //Evaluamos si estamos ya escuchando
     if (!_isListening) {
+      //NO ESTAMOS ESCUCHANDO
+      //seteamos la variable "available" en TRUE si el microfono esta funcionando y tenemos los permisos
+      // adecuados y seteamos la variable en FALSE si el mifrono NO esta funcionando
       bool available = await _speech.initialize(
         onStatus: (val) => print('onStatus: $val'),
         onError: (val) => print('onError: $val'),
       );
 
-      print(available);
-
+      //evaluamos si es el microfono funciona
       if (available) {
+        //MICROFONO FUNCIONA
+        //Seteamos la variable _isListening en TRUE (estamos en proceso de escucha)
         setState(() => _isListening = true);
+        //llamamos a la libreria para escuchar
         _speech.listen(
           onResult: (result) => setState(() {
+            //el resultado de la escucha la transformamos en TEXTO.
             _text = result.recognizedWords;
 
+            //Si el resultado tiene confianza y la confianza es mayor a 0
             if (result.hasConfidenceRating && result.confidence > 0) {
+              //seteamos el valor de la confianza para mostrarlo en pantalla
               _confidence = result.confidence;
+              //y dejamos de escuchar
               _isListening = false;
               _voiceVolume = 0;
             }
@@ -227,16 +246,22 @@ class _SpeechPageState extends State<SpeechPage> {
         );
       }
     } else {
+      //SI EL MICROFONO NO ESTA DISPONIBLE
+      //Seteamos la variable de escucha en FALSO.
       setState(() => _isListening = false);
       _voiceVolume = 0;
+      //Llamamos a la libreria para indicarle que detenga la escucha
       _speech.stop();
     }
   }
 
   void sendText() async {
     try {
+      //Convertimos el texto que esta en la variable _text que ingreso por el microfono
+      // a Uint8List para poder enviarlo
       Uint8List outputAsUint8List = new Uint8List.fromList(this._text.codeUnits);
-      this._bluetoothConnection.output.add(outputAsUint8List); // Sending data
+      //enviamos el Uint8List por BT
+      this._bluetoothConnection.output.add(outputAsUint8List);
       print(this._text.length);
     } catch (exception) {
       print('Cannot connect, exception occured');
@@ -244,11 +269,17 @@ class _SpeechPageState extends State<SpeechPage> {
   }
 
   void connectBT() async {
+    //Definimos la MAC del Modulo BT del Arduino
     String address = '00:19:09:01:1D:9A';
+    //Nos conectamos a la direccion definida
     this._bluetoothConnection = await BluetoothConnection.toAddress(address);
+    //Definimos el comando a enviar al Arduino
     String connect = "Conectar";
+    //convertimos de texto a Uint8List el comando para poder enviarlo
     Uint8List outputAsUint8List = new Uint8List.fromList(connect.codeUnits);
+    //Enviamos el comando "Conectar" en formato Uint8List
     await this._bluetoothConnection.output.add(outputAsUint8List);
+    //seteamos el estado del Widget en CONECTADO true.
     setState(() {
       this._connected = true;
     });
@@ -256,21 +287,20 @@ class _SpeechPageState extends State<SpeechPage> {
 
   void disconnectBT() async{
     try {
+      //Definimos el comando a enviar al Arduino
       String disconnect = "Desconectar";
+      //convertimos de texto a Uint8List el comando para poder enviarlo
       Uint8List outputAsUint8List = new Uint8List.fromList(disconnect.codeUnits);
+      //Enviamos el comando "Desconectar" en formato Uint8List
       await this._bluetoothConnection.output.add(outputAsUint8List);
+      //Usando la libreria de BT cerramos la conexion
       this._bluetoothConnection.close();
     } catch (exception) {
       print('Cannot connect, exception occured');
     }
+    //seteamos el estado del widget en DESCONECTADO
     setState(() {
       this._connected = false;
     });
-  }
-
-  Future<List> getBoundedDevices() async {
-    FlutterBluetoothSerial connection = FlutterBluetoothSerial.instance;
-    Future<List<BluetoothDevice>> bondedDevices = connection.getBondedDevices();
-    return bondedDevices;
   }
 }
